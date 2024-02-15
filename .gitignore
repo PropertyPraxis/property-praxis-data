@@ -1,0 +1,17 @@
+.DS_Store
+.venv
+data/*
+!data/.keep
+tmpdata
+*.shp
+*.shx
+*.dbf
+*.prj
+*.zip
+*.cpg
+*.dump
+*.csv
+*.json
+*.geojson
+*.mbtiles
+*.pbf

@@ -1,0 +1,53 @@
+[tool.poetry]
+name = "property-praxis-data"
+version = "0.1.0"
+description = ""
+authors = ["Property Praxis"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = "^2.31.0"
+boto3 = "^1.34.19"
+pandas = "^2.1.4"
+geopandas = "^0.14.2"
+psycopg2 = "^2.9.9"
+shapely = "^2.0.2"
+sqlalchemy = "^2.0.25"
+geoalchemy2 = "^0.14.3"
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.12.1"
+ruff = "^0.1.13"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+exclude = '''
+(
+    \.git
+    | \.venv
+    | \.vscode
+    | __pycache__
+    | build
+    | coverage
+    | dist
+)
+'''
+
+[tool.ruff]
+line-length = 88
+select = [
+    "E",
+    "F",
+    "W",
+    "I"
+]
+exclude = [
+    ".git",
+    ".venv",
+]
