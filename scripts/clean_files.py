@@ -295,13 +295,13 @@ if __name__ == "__main__":
         full_df.groupby(["year", "own_id"])[["id"]]
         .count()
         .reset_index()
-        .rename(columns={"id": "count"})
+        .rename(columns={"id": "own_count"})
     )
-    own_group_df["own_group"] = own_group_df["count"].apply(own_group)
+    own_group_df["own_group"] = own_group_df["own_count"].apply(own_group)
 
     parcel_prop_df = pd.merge(
         parcel_prop_df,
-        own_group_df[["year", "own_id", "own_group"]],
+        own_group_df[["year", "own_id", "own_count", "own_group"]],
         on=["year", "own_id"],
         how="left",
     )
@@ -314,7 +314,9 @@ if __name__ == "__main__":
                 "parcelno",
                 "propaddr",
                 "year",
+                "own_id",
                 "own_group",
+                "own_count",
                 "geometry",
                 "zipcode_sj",
             ]
@@ -333,7 +335,9 @@ if __name__ == "__main__":
                     "parcelno",
                     "propaddr",
                     "year",
+                    "own_id",
                     "own_group",
+                    "own_count",
                     "zipcode_sj",
                     "geom",
                 ]
@@ -350,7 +354,9 @@ if __name__ == "__main__":
                 "prop_id",
                 "parcelno",
                 "propaddr",
+                "own_id",
                 "own_group",
+                "own_count",
                 "year",
                 "centroid",
                 "zipcode_sj",
@@ -370,7 +376,9 @@ if __name__ == "__main__":
                     "parcelno",
                     "propaddr",
                     "year",
+                    "own_id",
                     "own_group",
+                    "own_count",
                     "zipcode_sj",
                     "centroid",
                 ]
@@ -382,7 +390,7 @@ if __name__ == "__main__":
             os.path.join(DATA_DIR, f"parcels-centroids-{year}.geojson")
         )
 
-    parcel_prop_df.drop(columns=["own_group"], inplace=True)
+    parcel_prop_df.drop(columns=["own_group", "own_id", "own_count"], inplace=True)
 
     print("writing zips_geom")
     zip_df[["zipcode", "geometry"]].to_postgis("zips_geom", if_exists="append", con=db)
