@@ -11,13 +11,14 @@ data: input/praxis_csvs/ input/praxis_shapefiles/ input/zipcodes.geojson
 tiles/%/: tiles/%.mbtiles
 	tile-join --no-tile-size-limit --force -e $@ $<
 
+# TODO: Switch at 14 instead?
 .PRECIOUS: tiles/parcels-centroids-%.mbtiles
 tiles/parcels-centroids-%.mbtiles: data/parcels-centroids-%.geojson
 	tippecanoe \
 	--simplification=10 \
 	--simplify-only-low-zooms \
 	--minimum-zoom=8 \
-	--maximum-zoom=13 \
+	--maximum-zoom=14 \
 	--no-tile-stats \
 	--detect-shared-borders \
 	--coalesce-smallest-as-needed \
@@ -32,7 +33,7 @@ tiles/parcels-%.mbtiles: data/parcels-%.geojson
 	tippecanoe \
 	--simplification=10 \
 	--simplify-only-low-zooms \
-	--minimum-zoom=13 \
+	--minimum-zoom=14 \
 	--maximum-zoom=14 \
 	--no-tile-stats \
 	--detect-shared-borders \
