@@ -111,7 +111,7 @@ def clean_dates(date_str):
 def fix_parcelno(parcelno):
     if not ("." in parcelno or "-" in parcelno):
         parcelno = parcelno + "."
-    if len(parcelno) == 8 and parcelno.endswith("."):
+    if len(parcelno.split(".")[0]) == 7 and "." in parcelno:
         parcelno = "0" + parcelno
     return parcelno
 
