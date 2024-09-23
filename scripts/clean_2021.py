@@ -1,4 +1,5 @@
 import os
+import re
 
 import geopandas as gpd
 import numpy as np
@@ -10,11 +11,27 @@ TMP_DATA_DIR = os.path.join(
 DATA_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data"
 )
+INPUT_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "input"
+)
+
+SPACE_RE = r"\s+"
+CLEAN_RE = r"(\.|,)"
+ADDR_SUFFIX_RE = r" (DR|DRIVE|AVE|AVENUE|ST|STREET|BLVD|BOULEVARD|FWY|FREEWAY)\.?$"
+LLC_RE = r" (LLC|INC|CO)\b"
+DETROIT_RE = r"LAND BANK|CITY OF DETROIT|DETROIT PARKS|City of Detroit|BRIDGE AUTHORITY|MDOT|DEPARTMENT OF"  # noqa
+
+
+def clean_owner(owner):
+    if not isinstance(owner, str):
+        return ""
+    return re.sub(r"\s+", " ", re.sub(r"[^A-Za-z0-9 ]+", "", owner)).strip()
 
 
 if __name__ == "__main__":
     cur_df = pd.read_csv(os.path.join(TMP_DATA_DIR, "cur_data.csv"))
     new_df = pd.read_csv(os.path.join(TMP_DATA_DIR, "new_2021_with_tp_address.csv"))
+
     new_ownid_df = (
         pd.read_csv(
             os.path.join(TMP_DATA_DIR, "NEW_2021_AKERS012622_117.csv"),
@@ -64,13 +81,26 @@ if __name__ == "__main__":
     parcel_merge_df["propstr"] = parcel_merge_df["taxpayer_s"]
     parcel_merge_df["propdir"] = ""
     parcel_merge_df["propzip"] = parcel_merge_df["taxpayer_z"]
-    # breakpoint()
-    # TODO: Try after getting basics to work
+
+    own_id_map = {}
+    for record in pd.read_csv(os.path.join(INPUT_DIR, "own-id-map.csv")).to_dict(
+        orient="records"
+    ):
+        own_id_map[clean_owner(record["taxpayer1"])] = record["own_id"]
+
+    parcel_merge_df["own_id"] = (
+        parcel_merge_df["taxpayer_1"]
+        .apply(clean_owner)
+        .map(own_id_map)
+        .fillna(parcel_merge_df["taxpayer_2"].apply(clean_owner).map(own_id_map))
+    )
+
+    parcel_merge_df = parcel_merge_df[~pd.isnull(parcel_merge_df["own_id"])]
     parcel_merge_df.to_file(
-        os.path.join(DATA_DIR, "praxis_shapefiles", "praxis2021.shp")
+        os.path.join(INPUT_DIR, "praxis_shapefiles", "praxis2021.shp")
     )
     parcel_merge_df.drop(labels=["geometry"], axis=1).to_csv(
-        os.path.join(DATA_DIR, "praxis_csvs", "PPlusFinal_2021_edit.csv"), index=False
+        os.path.join(INPUT_DIR, "praxis_csvs", "PPlusFinal_2021_edit.csv"), index=False
     )
     # parcel_merge_df.drop(labels=["geometry"], axis=1).to_csv(
     #     os.path.join(TMP_DATA_DIR, "parcel-data.csv"), index=False

@@ -2,15 +2,20 @@ import os
 
 import pandas as pd
 
-years = [2015, 2016, 2017, 2018, 2019, 2020, 2021]
+years = [2015, 2016, 2017, 2018, 2019, 2020]
 INPUT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "input"
 )
+map_years = [2021, 2022]
 COL_MAP = {
     "taxpayer_1": "taxpayer1",
     "taxpayer_2": "taxpayer2",
     "taxpayer 2": "taxpayer2",
 }
+
+SPACE_RE = r"\s+"
+CLEAN_RE = r"(\.|,)"
+EXCLUDE_RE = r"LAND BANK|CITY OF DETROIT|DETROIT PARKS|City of Detroit|BRIDGE AUTHORITY|MDOT|DEPARTMENT OF|UNK_|UNIDENTIFIED|UNKNOWN|TRUST"  # noqa
 
 if __name__ == "__main__":
     df_list = []
@@ -21,5 +26,13 @@ if __name__ == "__main__":
         ).rename(columns=COL_MAP)[["taxpayer1", "taxpayer2", "own_id"]]
         df = df[~pd.isnull(df["own_id"])].drop_duplicates()
         df_list.append(df)
+    for year in map_years:
+        print(year)
+        df = pd.read_csv(os.path.join(INPUT_DIR, f"own-id-{year}.csv")).rename(
+            columns={"taxpayer": "taxpayer1", "owner": "own_id"}
+        )
+        df = df[~pd.isnull(df["own_id"])].drop_duplicates()
+        df_list.append(df)
     df = pd.concat(df_list).drop_duplicates()
+    df = df[~df.own_id.str.contains(EXCLUDE_RE, regex=True)]
     df.to_csv(os.path.join(INPUT_DIR, "own-id-map.csv"), index=False)

@@ -77,6 +77,12 @@ COL_MAP = {
 }
 
 
+def clean_owner(owner):
+    if not isinstance(owner, str):
+        return ""
+    return re.sub(r"\s+", " ", re.sub(r"[^A-Za-z0-9 ]+", "", owner)).strip()
+
+
 def own_group(count):
     if count > 9 and count <= 20:
         return 1
@@ -225,7 +231,7 @@ if __name__ == "__main__":
     csv_df_list = []
     years = []
     for csv_filename in os.listdir(os.path.join(INPUT_DIR, "praxis_csvs")):
-        if "Final" not in csv_filename:
+        if ("2021" not in csv_filename) or ("Final" not in csv_filename):
             continue
         year_str = re.search(r"\d{4}", csv_filename)[0]
         years.append(int(year_str))
@@ -233,6 +239,7 @@ if __name__ == "__main__":
         csv_df_list.append(
             clean_csv_df(os.path.join(INPUT_DIR, "praxis_csvs", csv_filename))
         )
+    # TODO: Load others post 2020 here
     full_df = pd.concat(csv_df_list, ignore_index=True).drop_duplicates()
 
     parcel_df = full_df.drop_duplicates(
@@ -252,7 +259,7 @@ if __name__ == "__main__":
                 parcel_df,
             )
         )
-
+    # TODO: Load others post 2020 here
     parcel_prop_df = pd.concat(geom_df_list)
     prop_df = (
         parcel_prop_df.drop_duplicates(subset=["parcelno", "propaddr"])

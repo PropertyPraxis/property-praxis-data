@@ -45,6 +45,15 @@ tiles/parcels-%.mbtiles: data/parcels-%.geojson
 	--force \
 	-L parcels:$< -o $@
 
+input/praxis_csvs/PPlusFinal_2022.csv: input/own-id-map.csv
+	poetry run python scripts/clean_2022.py
+
+input/praxis_csvs/PPlusFinal_2021.csv: input/own-id-map.csv
+	poetry run python scripts/clean_2021.py
+
+input/own-id-map.csv:
+	poetry run python scripts/own_id_map.py
+
 # TODO: fix projection here to avoid handling in geopandas
 input/zipcodes.geojson:
 	wget -O $@ "https://opendata.arcgis.com/datasets/f6273f93db1b4f57b7091ef1f43271e7_0.geojson"
