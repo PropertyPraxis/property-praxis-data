@@ -1,5 +1,5 @@
 S3_BUCKET = property-praxis-data
-YEARS = 2015 2016 2017 2018 2019 2020 2021
+YEARS = 2015 2016 2017 2018 2019 2020 2021 2022
 
 all: $(foreach year,$(YEARS),tiles/parcels-$(year)/ tiles/parcels-centroids-$(year)/)
 

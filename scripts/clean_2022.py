@@ -52,6 +52,7 @@ if __name__ == "__main__":
         .map(own_id_map)
         .fillna(parcel_gdf["taxpayer_2"].apply(clean_owner).map(own_id_map))
     )
+    parcel_gdf["propstr"] = ""
 
     parcel_gdf = parcel_gdf[~pd.isnull(parcel_gdf["own_id"])]
     parcel_gdf.to_file(os.path.join(INPUT_DIR, "praxis_shapefiles", "praxis2022.shp"))

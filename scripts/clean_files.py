@@ -190,7 +190,10 @@ def clean_csv_df(csv_filename):
 
 
 def clean_shp_df(shp_filename, zip_df, parcel_prop_df):
-    shp_df = gpd.read_file("zip://" + shp_filename)
+    read_filename = shp_filename
+    if read_filename.endswith(".zip"):
+        read_filename = "zip://" + read_filename
+    shp_df = gpd.read_file(read_filename)
     shp_df = shp_df.rename(columns=COL_MAP)
     # TODO: set_geometry somewhere
     shp_df = fix_zipcodes(shp_df, zip_df)
@@ -231,7 +234,7 @@ if __name__ == "__main__":
     csv_df_list = []
     years = []
     for csv_filename in os.listdir(os.path.join(INPUT_DIR, "praxis_csvs")):
-        if ("2021" not in csv_filename) or ("Final" not in csv_filename):
+        if "Final" not in csv_filename:
             continue
         year_str = re.search(r"\d{4}", csv_filename)[0]
         years.append(int(year_str))
@@ -251,14 +254,15 @@ if __name__ == "__main__":
 
     geom_df_list = []
     for shp_filename in os.listdir(os.path.join(INPUT_DIR, "praxis_shapefiles")):
-        print(shp_filename)
-        geom_df_list.append(
-            clean_shp_df(
-                os.path.join(INPUT_DIR, "praxis_shapefiles", shp_filename),
-                zip_df,
-                parcel_df,
+        if shp_filename.endswith(".zip") or shp_filename.endswith(".shp"):
+            print(shp_filename)
+            geom_df_list.append(
+                clean_shp_df(
+                    os.path.join(INPUT_DIR, "praxis_shapefiles", shp_filename),
+                    zip_df,
+                    parcel_df,
+                )
             )
-        )
     # TODO: Load others post 2020 here
     parcel_prop_df = pd.concat(geom_df_list)
     prop_df = (
