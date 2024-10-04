@@ -14,6 +14,7 @@ INSERT INTO
         taxpayer,
         count,
         own_group,
+        parcelno,
         propno,
         propdir,
         propzip,
@@ -21,7 +22,7 @@ INSERT INTO
         centroid
     )
 SELECT
-    feature_id,
+    DISTINCT ON(parcelno, year) feature_id,
     saledate,
     saleprice,
     totsqft,
@@ -35,6 +36,7 @@ SELECT
     taxpayer,
     count,
     own_group,
+    parcelno,
     propno,
     propdir,
     propzip,

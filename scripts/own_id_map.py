@@ -15,7 +15,7 @@ COL_MAP = {
 
 SPACE_RE = r"\s+"
 CLEAN_RE = r"(\.|,)"
-EXCLUDE_RE = r"LAND BANK|CITY OF DETROIT|DETROIT PARKS|City of Detroit|BRIDGE AUTHORITY|MDOT|DEPARTMENT OF|UNK_|UNIDENTIFIED|UNKNOWN|TRUST"  # noqa
+EXCLUDE_RE = r"LAND BANK|CITY OF DETROIT|DETROIT PARKS|City of Detroit|BRIDGE AUTHORITY|MDOT|DEPARTMENT OF|DEPT OF|UNK_|UNIDENTIFIED|UNKNOWN|TRUST"  # noqa
 
 if __name__ == "__main__":
     df_list = []
@@ -35,4 +35,6 @@ if __name__ == "__main__":
         df_list.append(df)
     df = pd.concat(df_list).drop_duplicates()
     df = df[~df.own_id.str.contains(EXCLUDE_RE, regex=True)]
+    # TODO: Clean up matty moroun
+    # df[df.own_id.str.contains("MANUEL") & df.own_id.str.]
     df.to_csv(os.path.join(INPUT_DIR, "own-id-map.csv"), index=False)

@@ -137,6 +137,7 @@ CREATE TABLE parcels (
     taxpayer VARCHAR(256),
     count INTEGER,
     own_group INTEGER,
+    parcelno VARCHAR(256),
     propno DOUBLE PRECISION,
     propdir VARCHAR(256),
     propzip VARCHAR(256),

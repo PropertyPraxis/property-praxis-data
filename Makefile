@@ -33,7 +33,7 @@ tiles/parcels-%.mbtiles: data/parcels-%.geojson
 	tippecanoe \
 	--simplification=10 \
 	--simplify-only-low-zooms \
-	--minimum-zoom=14 \
+	--minimum-zoom=13 \
 	--maximum-zoom=14 \
 	--no-tile-stats \
 	--detect-shared-borders \

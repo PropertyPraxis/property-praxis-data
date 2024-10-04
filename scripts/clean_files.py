@@ -231,6 +231,12 @@ def clean_shp_df(shp_filename, zip_df, parcel_prop_df):
 
 
 if __name__ == "__main__":
+    own_id_map = {}
+    for record in pd.read_csv(os.path.join(INPUT_DIR, "own-id-map.csv")).to_dict(
+        orient="records"
+    ):
+        own_id_map[clean_owner(record["taxpayer1"])] = record["own_id"]
+
     csv_df_list = []
     years = []
     for csv_filename in os.listdir(os.path.join(INPUT_DIR, "praxis_csvs")):
@@ -244,6 +250,14 @@ if __name__ == "__main__":
         )
     # TODO: Load others post 2020 here
     full_df = pd.concat(csv_df_list, ignore_index=True).drop_duplicates()
+
+    full_df["own_id"] = (
+        full_df["taxpayer"]
+        .apply(clean_owner)
+        .map(own_id_map)
+        .fillna(full_df["taxpayer2"].apply(clean_owner).map(own_id_map))
+    )
+    full_df = full_df[~pd.isnull(full_df["own_id"])]
 
     parcel_df = full_df.drop_duplicates(
         subset=["parcelno", "propaddr", "propno"]
@@ -263,8 +277,11 @@ if __name__ == "__main__":
                     parcel_df,
                 )
             )
-    # TODO: Load others post 2020 here
-    parcel_prop_df = pd.concat(geom_df_list)
+
+    parcel_prop_df = pd.concat(geom_df_list).drop_duplicates(
+        subset=["parcelno", "year"]
+    )
+
     prop_df = (
         parcel_prop_df.drop_duplicates(subset=["parcelno", "propaddr"])
         .reset_index()

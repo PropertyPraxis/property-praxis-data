@@ -138,6 +138,7 @@ def compare_21_20():
     df_21["taxpayer1"] = df_21["taxpayer1"].apply(clean_owner)
     df_21["taxpayer2"] = df_21["taxpayer2"].apply(clean_owner)
     df_21["parcel_num"] = df_21["parcel_num"].apply(fix_parcelno)
+    df_21.drop_duplicates(subset=["parcel_num"], inplace=True)
     df_21["address"] = (
         df_21["address"]
         .str.replace(SPACE_RE, " ", regex=True)
