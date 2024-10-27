@@ -45,6 +45,7 @@ BASE_COLS = [
 COL_MAP = {
     "id_old": "old_id",
     "OBJECTID": "id",
+    # "object_id": "id",
     "taxpayer1": "taxpayer",
     "taxpayer 1": "taxpayer",  # TODO: fix this
     "taxpayer_1": "taxpayer",
@@ -54,8 +55,8 @@ COL_MAP = {
     "parcelnumber": "parcelno",
     "parcel_num": "parcelno",
     "parcelnum": "parcelno",
+    "parcel_number": "parcelno",
     "address": "propaddr",
-    "zipcode": "propzip",
     "taxpayerstreet": "tpaddr",
     "taxpayer_s": "tpaddr",
     "taxpayercity": "tpcity",
@@ -74,6 +75,12 @@ COL_MAP = {
     "year_built": "resyrbuilt"
     # TODO: Typo here, total something?
     # "taxpayerstate": "totacres",
+}
+
+
+ZIP_COL_MAP = {
+    "zipcode": "propzip",
+    "zip_code": "propzip",
 }
 
 
@@ -184,6 +191,8 @@ def clean_csv_df(csv_filename):
     df["parcelno"] = df["parcelno"].apply(fix_parcelno)
     if "cityrbuilt" not in df.columns:
         df["cityrbuilt"] = np.nan
+    if "propzip" not in df.columns:
+        df = df.rename(columns=ZIP_COL_MAP)
 
     df["year"] = int(year_str)
     return df
@@ -195,9 +204,9 @@ def clean_shp_df(shp_filename, zip_df, parcel_prop_df):
         read_filename = "zip://" + read_filename
     shp_df = gpd.read_file(read_filename)
     shp_df = shp_df.rename(columns=COL_MAP)
-    # TODO: set_geometry somewhere
     shp_df = fix_zipcodes(shp_df, zip_df)
 
+    # TODO: Something is slow here
     shp_df = shp_df.loc[
         ~shp_df["parcelno"].isna(), ["parcelno", "propaddr", "zipcode_sj", "geometry"]
     ]
@@ -248,7 +257,7 @@ if __name__ == "__main__":
         csv_df_list.append(
             clean_csv_df(os.path.join(INPUT_DIR, "praxis_csvs", csv_filename))
         )
-    # TODO: Load others post 2020 here
+
     full_df = pd.concat(csv_df_list, ignore_index=True).drop_duplicates()
 
     full_df["own_id"] = (
@@ -320,12 +329,13 @@ if __name__ == "__main__":
     )
 
     own_group_df = (
-        full_df.groupby(["year", "own_id"])[["id"]]
-        .count()
+        full_df.groupby(["year", "own_id"])
+        .size()
         .reset_index()
-        .rename(columns={"id": "own_count"})
+        .rename(columns={0: "own_count"})
     )
     own_group_df["own_group"] = own_group_df["own_count"].apply(own_group)
+    # TODO: Filter for only own_count >= 10?
 
     parcel_prop_df = pd.merge(
         parcel_prop_df,
