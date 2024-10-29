@@ -45,7 +45,6 @@ BASE_COLS = [
 COL_MAP = {
     "id_old": "old_id",
     "OBJECTID": "id",
-    # "object_id": "id",
     "taxpayer1": "taxpayer",
     "taxpayer 1": "taxpayer",  # TODO: fix this
     "taxpayer_1": "taxpayer",
@@ -258,15 +257,35 @@ if __name__ == "__main__":
             clean_csv_df(os.path.join(INPUT_DIR, "praxis_csvs", csv_filename))
         )
 
-    full_df = pd.concat(csv_df_list, ignore_index=True).drop_duplicates()
+    combined_df = pd.concat(csv_df_list, ignore_index=True).drop_duplicates()
 
-    full_df["own_id"] = (
-        full_df["taxpayer"]
+    combined_df["own_id"] = (
+        combined_df["taxpayer"]
         .apply(clean_owner)
         .map(own_id_map)
-        .fillna(full_df["taxpayer2"].apply(clean_owner).map(own_id_map))
+        .fillna(combined_df["taxpayer2"].apply(clean_owner).map(own_id_map))
     )
-    full_df = full_df[~pd.isnull(full_df["own_id"])]
+    combined_df = combined_df[~pd.isnull(combined_df["own_id"])]
+
+    # Only retain owners for years where they have at least 10 parcels
+    # TODO: Maybe revisit and instead pull any owner with at least 10 parcels any year
+    full_df_list = []
+    for year in years:
+        year_own_df = (
+            combined_df[combined_df["year"] == year]
+            .groupby(["own_id"])
+            .size()
+            .reset_index()
+            .rename(columns={0: "own_count"})
+        )
+        min_10_owners = year_own_df[year_own_df["own_count"] >= 10]["own_id"]
+        full_df_list.append(
+            combined_df[
+                (combined_df["year"] == year)
+                & (combined_df["own_id"].isin(min_10_owners))
+            ]
+        )
+    full_df = pd.concat(full_df_list, ignore_index=True).drop_duplicates()
 
     parcel_df = full_df.drop_duplicates(
         subset=["parcelno", "propaddr", "propno"]
@@ -335,7 +354,6 @@ if __name__ == "__main__":
         .rename(columns={0: "own_count"})
     )
     own_group_df["own_group"] = own_group_df["own_count"].apply(own_group)
-    # TODO: Filter for only own_count >= 10?
 
     parcel_prop_df = pd.merge(
         parcel_prop_df,
