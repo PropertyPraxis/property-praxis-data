@@ -19,7 +19,8 @@ INSERT INTO
         propdir,
         propzip,
         propzip2,
-        centroid
+        centroid,
+        geom
     )
 SELECT
     DISTINCT ON(parcelno, year) feature_id,
@@ -41,7 +42,8 @@ SELECT
     propdir,
     propzip,
     propzip2,
-    centroid
+    centroid,
+    geom
 FROM
     (
         SELECT
@@ -94,7 +96,8 @@ FROM
             p.propstr,
             p.propzip AS propzip2,
             p.zipcode_sj AS propzip,
-            ppg.centroid AS centroid
+            ppg.centroid AS centroid,
+            ppg.geom AS geom
         FROM
             parcel_property_geom AS ppg
             INNER JOIN property AS p ON p.prop_id = ppg.prop_id

@@ -20,12 +20,15 @@ CREATE TABLE parcel_property_geom (
     propaddr VARCHAR(256),
     year INTEGER,
     zipcode_sj VARCHAR(256),
-    centroid GEOMETRY(GEOMETRY, 4326)
+    centroid GEOMETRY(GEOMETRY, 4326),
+    geom GEOMETRY(GEOMETRY, 4326)
 );
 
 CREATE INDEX parcel_property_geom_year_idx ON parcel_property_geom (year);
 
 CREATE INDEX parcel_property_geom_spatial_idx ON parcel_property_geom USING gist(centroid);
+
+CREATE INDEX parcel_property_geometry_spatial_idx ON parcel_property_geom USING gist(geom);
 
 CREATE TABLE zips_geom (
     objectid SERIAL PRIMARY KEY,
@@ -143,6 +146,7 @@ CREATE TABLE parcels (
     propzip VARCHAR(256),
     propzip2 VARCHAR(256),
     centroid GEOMETRY(POINT, 4326),
+    geom GEOMETRY(GEOMETRY, 4326),
     CONSTRAINT parcels_pk PRIMARY KEY (feature_id, year)
 );
 
@@ -151,3 +155,5 @@ CREATE INDEX parcels_year_idx ON parcels (year);
 CREATE INDEX parcels_zipcode_idx ON parcels USING gin(propzip gin_trgm_ops);
 
 CREATE INDEX parcels_spatial_idx ON parcels USING gist(centroid);
+
+CREATE INDEX parcels_spatial_geom_idx ON parcels USING gist(geom);

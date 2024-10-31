@@ -383,9 +383,7 @@ if __name__ == "__main__":
 
     for year in parcel_prop_df["year"].unique():
         parcel_prop_year = gpd.GeoDataFrame(
-            parcel_prop_df.loc[
-                (parcel_prop_df["year"] == year) & (parcel_prop_df["own_group"] > 0)
-            ][
+            parcel_prop_df.loc[parcel_prop_df["year"] == year][
                 [
                     "prop_id",
                     "parcelno",
@@ -414,19 +412,18 @@ if __name__ == "__main__":
                 "own_group",
                 "own_count",
                 "year",
+                "geom",
                 "centroid",
                 "zipcode_sj",
             ]
         ],
         crs="EPSG:4326",
-        geometry="centroid",
+        geometry="geom",
     )
 
     for year in parcel_prop_df["year"].unique():
         parcel_prop_year = gpd.GeoDataFrame(
-            parcel_prop_df.loc[
-                (parcel_prop_df["year"] == year) & (parcel_prop_df["own_group"] > 0)
-            ][
+            parcel_prop_df.loc[parcel_prop_df["year"] == year][
                 [
                     "prop_id",
                     "parcelno",
@@ -447,6 +444,10 @@ if __name__ == "__main__":
         )
 
     parcel_prop_df.drop(columns=["own_group", "own_id", "own_count"], inplace=True)
+    # Have to convert directly to WKT here to avoid SQL issues
+    parcel_prop_df["centroid"] = parcel_prop_df["centroid"].apply(
+        lambda x: f"SRID=4326;{x.wkt}"
+    )
 
     print("writing zips_geom")
     zip_df[["zipcode", "geometry"]].to_postgis("zips_geom", if_exists="append", con=db)
