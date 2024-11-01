@@ -150,6 +150,8 @@ CREATE TABLE parcels (
     CONSTRAINT parcels_pk PRIMARY KEY (feature_id, year)
 );
 
+CREATE INDEX parcels_parcelno_index ON parcels (parcelno);
+
 CREATE INDEX parcels_year_idx ON parcels (year);
 
 CREATE INDEX parcels_zipcode_idx ON parcels USING gin(propzip gin_trgm_ops);
