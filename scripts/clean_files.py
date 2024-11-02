@@ -238,12 +238,32 @@ def clean_shp_df(shp_filename, zip_df, parcel_prop_df):
     return geom_df
 
 
-if __name__ == "__main__":
+def clean_own_id(own_id):
+    return re.sub(r"\s+", " ", own_id.upper()).strip()
+
+
+def get_own_id_map():
+    # TODO: Move this into creation of own id map
     own_id_map = {}
-    for record in pd.read_csv(os.path.join(INPUT_DIR, "own-id-map.csv")).to_dict(
-        orient="records"
-    ):
+    own_id_df = pd.read_csv(os.path.join(INPUT_DIR, "own-id-map.csv"))
+    own_id_df["own_id"] = own_id_df["own_id"].apply(clean_own_id)
+    own_id_df["own_id"] = own_id_df["own_id"].apply(
+        lambda x: 'MANUEL "MATTY" MOROUN'
+        if (("MANUEL" in x) and ("MOROUN" in x))
+        else x
+    )
+    own_id_df = own_id_df[
+        ~own_id_df["own_id"].str.contains(r"HENRY FORD|UAW|WAYNE COUNTY|NON\-PROFIT")
+    ]
+    own_id_df.to_csv("own-id-testing.csv", index=False)
+    for record in own_id_df.to_dict(orient="records"):
         own_id_map[clean_owner(record["taxpayer1"])] = record["own_id"]
+        # TODO: add taxpayer2?
+    return own_id_map
+
+
+if __name__ == "__main__":
+    own_id_map = get_own_id_map()
 
     csv_df_list = []
     years = []
@@ -361,6 +381,7 @@ if __name__ == "__main__":
         on=["year", "own_id"],
         how="left",
     )
+    parcel_prop_df = parcel_prop_df.loc[parcel_prop_df["own_group"] > 0]
 
     parcel_prop_df = gpd.GeoDataFrame(
         parcel_prop_df[
