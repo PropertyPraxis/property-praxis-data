@@ -243,19 +243,8 @@ def clean_own_id(own_id):
 
 
 def get_own_id_map():
-    # TODO: Move this into creation of own id map
     own_id_map = {}
     own_id_df = pd.read_csv(os.path.join(INPUT_DIR, "own-id-map.csv"))
-    own_id_df["own_id"] = own_id_df["own_id"].apply(clean_own_id)
-    own_id_df["own_id"] = own_id_df["own_id"].apply(
-        lambda x: 'MANUEL "MATTY" MOROUN'
-        if (("MANUEL" in x) and ("MOROUN" in x))
-        else x
-    )
-    own_id_df = own_id_df[
-        ~own_id_df["own_id"].str.contains(r"HENRY FORD|UAW|WAYNE COUNTY|NON\-PROFIT")
-    ]
-    own_id_df.to_csv("own-id-testing.csv", index=False)
     for record in own_id_df.to_dict(orient="records"):
         own_id_map[clean_owner(record["taxpayer1"])] = record["own_id"]
         # TODO: add taxpayer2?

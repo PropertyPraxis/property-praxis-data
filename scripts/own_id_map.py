@@ -1,4 +1,5 @@
 import os
+import re
 
 import pandas as pd
 
@@ -6,7 +7,7 @@ years = [2015, 2016, 2017, 2018, 2019, 2020]
 INPUT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "input"
 )
-map_years = [2021, 2022, 2023]
+map_years = [2021, 2022, 2023, 2024]
 COL_MAP = {
     "taxpayer_1": "taxpayer1",
     "taxpayer_2": "taxpayer2",
@@ -15,7 +16,12 @@ COL_MAP = {
 
 SPACE_RE = r"\s+"
 CLEAN_RE = r"(\.|,)"
-EXCLUDE_RE = r"LAND BANK|CITY OF DETROIT|DETROIT PARKS|City of Detroit|BRIDGE AUTHORITY|MDOT|DEPARTMENT OF|DEPT OF|UNK_|UNIDENTIFIED|UNKNOWN|TRUST"  # noqa
+EXCLUDE_RE = r"LAND BANK|CITY OF DETROIT|DETROIT PARKS|BRIDGE AUTHORITY|MDOT|DEPARTMENT OF|DEPT OF|UNK_|UNIDENTIFIED|UNKNOWN|TRUST|HENRY FORD|UAT|WAYNE COUNTY|NON\-PROFIT"  # noqa
+
+
+def clean_own_id(own_id):
+    return re.sub(r"\s+", " ", own_id.upper()).strip()
+
 
 if __name__ == "__main__":
     df_list = []
@@ -34,7 +40,11 @@ if __name__ == "__main__":
         df = df[~pd.isnull(df["own_id"])].drop_duplicates()
         df_list.append(df)
     df = pd.concat(df_list).drop_duplicates()
+    df["own_id"] = df["own_id"].apply(clean_own_id)
+    df["own_id"] = df["own_id"].apply(
+        lambda x: 'MANUEL "MATTY" MOROUN'
+        if (("MANUEL" in x) and ("MOROUN" in x))
+        else x
+    )
     df = df[~df.own_id.str.contains(EXCLUDE_RE, regex=True)]
-    # TODO: Clean up matty moroun
-    # df[df.own_id.str.contains("MANUEL") & df.own_id.str.]
     df.to_csv(os.path.join(INPUT_DIR, "own-id-map.csv"), index=False)
