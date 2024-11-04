@@ -2,91 +2,13 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-CREATE TABLE property (
-    prop_id BIGINT PRIMARY KEY,
-    propno DOUBLE PRECISION,
-    parcelno VARCHAR(256),
-    propaddr VARCHAR(256),
-    propdir VARCHAR(256),
-    propstr VARCHAR(256),
-    propzip VARCHAR(256),
-    zipcode_sj VARCHAR(256)
-);
-
-CREATE TABLE parcel_property_geom (
-    parprop_id BIGINT PRIMARY KEY,
-    prop_id BIGINT REFERENCES property (prop_id),
-    parcelno VARCHAR(256),
-    propaddr VARCHAR(256),
-    year INTEGER,
-    zipcode_sj VARCHAR(256),
-    centroid GEOMETRY(GEOMETRY, 4326),
-    geom GEOMETRY(GEOMETRY, 4326)
-);
-
-CREATE INDEX parcel_property_geom_year_idx ON parcel_property_geom (year);
-
-CREATE INDEX parcel_property_geom_spatial_idx ON parcel_property_geom USING gist(centroid);
-
-CREATE INDEX parcel_property_geometry_spatial_idx ON parcel_property_geom USING gist(geom);
-
-CREATE TABLE zips_geom (
-    objectid SERIAL PRIMARY KEY,
-    zipcode VARCHAR(50),
-    -- TODO: index?
-    geometry GEOMETRY(GEOMETRY, 4326) -- TODO: geography? index?
-);
-
-CREATE INDEX zips_geom_spatial_idx ON zips_geom USING gist(geometry);
-
-CREATE INDEX zips_geom_zip ON zips_geom (zipcode);
-
-CREATE TABLE owner_taxpayer (
-    owntax_id BIGINT PRIMARY KEY,
-    taxpayer VARCHAR(256),
-    own_id VARCHAR(256) -- TODO: indexing here?
-);
-
-CREATE TABLE taxpayer (
-    tp_id BIGINT PRIMARY KEY,
-    owntax_id BIGINT REFERENCES owner_taxpayer (owntax_id),
-    taxpayer2 VARCHAR(256),
-    tpaddr VARCHAR(256),
-    tpcity VARCHAR(256),
-    tpstate VARCHAR(256),
-    tpzip VARCHAR(256),
-    taxstatus VARCHAR(256)
-);
-
-CREATE TABLE taxpayer_property (
-    taxparprop_id BIGINT PRIMARY KEY,
-    tp_id BIGINT REFERENCES taxpayer (tp_id),
-    prop_id BIGINT REFERENCES property (prop_id)
-);
-
-CREATE TABLE year (
-    taxparprop_id BIGINT REFERENCES taxpayer_property (taxparprop_id),
-    year INTEGER,
-    saledate DATE,
-    saleprice DOUBLE PRECISION,
-    totsqft DOUBLE PRECISION,
-    totacres DOUBLE PRECISION,
-    cityrbuilt INT,
-    resyrbuilt INT,
-    PRIMARY KEY (taxparprop_id, year)
-);
-
-CREATE INDEX year_year_idx ON year (year);
-
 CREATE TABLE parcels (
     feature_id SERIAL,
     saledate DATE,
     saleprice DOUBLE PRECISION,
     totsqft DOUBLE PRECISION,
     totacres DOUBLE PRECISION,
-    cityrbuilt INTEGER,
     resyrbuilt INTEGER,
-    prop_id BIGINT,
     year INTEGER,
     propaddr VARCHAR(256),
     own_id VARCHAR(256),
@@ -119,12 +41,13 @@ CREATE MATERIALIZED VIEW owner_count AS (
             DISTINCT p.year,
             p.own_id AS own_id,
             p.own_group AS own_group,
-            COUNT(p.own_id) AS count
+            p.count AS count
         FROM
             parcels AS p
         GROUP BY
             p.year,
             p.own_id,
-            p.own_group
+            p.own_group,
+            p.count
     )
 );

@@ -1,14 +1,19 @@
+import csv
 import os
 import re
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+from shapely.ops import unary_union
 from sqlalchemy import create_engine
 
 db = create_engine(
     os.getenv("DATABASE_URL", "postgresql://postgres:postgres@0.0.0.0:35432/postgres")
 )
+
+YEARS = [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
+# YEARS = [2019, 2024]
 
 INPUT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "input"
@@ -38,8 +43,6 @@ BASE_COLS = [
     "saleprice",
     "totsqft",
     "totacres",
-    "cityrbuilt",
-    "resyrbuilt",
 ]
 
 COL_MAP = {
@@ -81,6 +84,8 @@ ZIP_COL_MAP = {
     "zipcode": "propzip",
     "zip_code": "propzip",
 }
+
+EXCLUDE_RE = r"LAND BANK|CITY OF DETROIT|DETROIT PARKS|BRIDGE AUTHORITY|MDOT|DEPARTMENT OF|DEPT OF|UNK_|UNIDENTIFIED|UNKNOWN|TRUST|HENRY FORD|UAT|WAYNE COUNTY|NON\-PROFIT"  # noqa
 
 
 def clean_owner(owner):
@@ -128,43 +133,6 @@ def fix_parcelno(parcelno):
     return parcelno
 
 
-def fix_zipcodes(shp_df, zip_df):
-    zip_df = zip_df[["geometry", "zipcode"]].set_geometry("geometry").to_crs(4326)
-
-    # Add a temporary ID column
-    shp_df["temp_id"] = range(1, len(shp_df) + 1)
-    centroid_df = shp_df.copy()
-    centroid_df["geometry"] = centroid_df.to_crs(3857).centroid.to_crs(4326)
-    centroid_df = centroid_df.set_geometry("geometry")
-    within_df = gpd.sjoin(
-        centroid_df,
-        zip_df,
-        predicate="within",
-    )
-    na_df = within_df[within_df["zipcode"].isna()].drop(columns=["zipcode"])
-    within_df = within_df.dropna(subset=["zipcode"]).to_crs(4326)
-
-    na_df = (
-        gpd.GeoDataFrame(na_df)
-        .rename(columns={0: "geometry", "index_right": "ir"})
-        .set_geometry("geometry")
-        .to_crs(4326)
-    )
-    na_df = gpd.sjoin_nearest(na_df, zip_df)
-
-    within_df = within_df.drop(columns="geometry")
-    na_df = na_df.drop(columns="geometry")
-
-    join_df = pd.concat([within_df, na_df]).sort_values(by="temp_id")[
-        ["temp_id", "zipcode"]
-    ]
-    shp_df = gpd.GeoDataFrame(
-        pd.merge(shp_df, join_df, on=["temp_id"], how="left")
-    ).rename(columns={"zipcode": "zipcode_sj"})
-
-    return shp_df.dropna(subset=["zipcode_sj"])
-
-
 def add_propno_if_missing(df):
     if "propno" not in df.columns:
         df["propno"] = df["propstr"].apply(
@@ -188,8 +156,6 @@ def clean_csv_df(csv_filename):
     df = df.rename(columns=COL_MAP)
     df = add_propno_if_missing(df)
     df["parcelno"] = df["parcelno"].apply(fix_parcelno)
-    if "cityrbuilt" not in df.columns:
-        df["cityrbuilt"] = np.nan
     if "propzip" not in df.columns:
         df = df.rename(columns=ZIP_COL_MAP)
 
@@ -197,45 +163,61 @@ def clean_csv_df(csv_filename):
     return df
 
 
-def clean_shp_df(shp_filename, zip_df, parcel_prop_df):
+def add_zipcode_with_most_overlap(parcels_gdf, zips_gdf):
+    joined_gdf = gpd.sjoin(parcels_gdf, zips_gdf, how="left", op="intersects")
+
+    joined_gdf["overlap_area"] = joined_gdf.geometry.intersection(
+        joined_gdf.geometry
+    ).area
+    joined_gdf["original_index"] = joined_gdf.index
+
+    result = joined_gdf.loc[
+        joined_gdf.groupby("original_index")["overlap_area"].idxmax()
+    ][["original_index", "zipcode"]]
+
+    parcels_gdf = parcels_gdf.merge(
+        result, left_index=True, right_on="original_index", how="left"
+    )
+
+    parcels_gdf.drop(columns=["original_index"], inplace=True)
+    return parcels_gdf
+
+
+def clean_shp_df(shp_filename, zip_df, parcel_df):
     read_filename = shp_filename
     if read_filename.endswith(".zip"):
         read_filename = "zip://" + read_filename
     shp_df = gpd.read_file(read_filename)
-    shp_df = shp_df.rename(columns=COL_MAP)
-    shp_df = fix_zipcodes(shp_df, zip_df)
-
-    # TODO: Something is slow here
-    shp_df = shp_df.loc[
-        ~shp_df["parcelno"].isna(), ["parcelno", "propaddr", "zipcode_sj", "geometry"]
-    ]
-    shp_df["tmp_id"] = shp_df["parcelno"].astype(str) + shp_df["propaddr"].astype(str)
-
-    dup_ids = shp_df.loc[shp_df.duplicated("tmp_id"), "tmp_id"].unique()
-    dup_shp = shp_df.loc[shp_df["tmp_id"].isin(dup_ids)]
-
-    # Aggregating duplicated rows
-    dup_shp = (
-        dup_shp.groupby(["parcelno", "propaddr"])
-        .agg(
-            geometry=("geometry", lambda g: g.unary_union),
-            geom_agg_count=("geometry", "size"),
-            zipcode_sj=("zipcode_sj", lambda x: ", ".join(x.unique())),
-        )
-        .reset_index()
+    shp_df = gpd.GeoDataFrame(
+        shp_df.rename(columns=COL_MAP)[["parcelno", "geometry"]],
+        geometry="geometry",
+        crs=shp_df.crs,
     )
 
-    uni_shp = shp_df.loc[~shp_df["tmp_id"].isin(dup_ids)]
-    shp_df = pd.concat([dup_shp, uni_shp])
-    geom_df = pd.merge(parcel_prop_df, shp_df, on=["parcelno", "propaddr"])
+    year = int(re.search(r"\d{4}", shp_filename)[0])
+    parcel_df = parcel_df.loc[parcel_df["year"] == year]
 
-    year_str = re.search(r"\d{4}", shp_filename)[0]
-    geom_df["year"] = int(year_str)
+    geom_parcel_gdf = shp_df.loc[
+        shp_df["parcelno"].notna()
+        & shp_df["parcelno"].isin(parcel_df["parcelno"].dropna())
+    ].to_crs("EPSG:3857")
+    geom_parcel_gdf = add_zipcode_with_most_overlap(
+        geom_parcel_gdf, zip_df[["zipcode", "geometry"]].to_crs("EPSG:3857")
+    )
+    geom_parcel_gdf = geom_parcel_gdf.rename(columns={"zipcode": "propzip"})
 
-    geom_df = geom_df.drop_duplicates()
-    geom_df = geom_df.set_geometry("geometry")
-    geom_df.crs = "EPSG:4326"
-    return geom_df
+    parcel_gdf = (
+        geom_parcel_gdf.sort_values(["parcelno"])
+        .groupby(["parcelno"], as_index=False)
+        .agg({"geometry": lambda geoms: unary_union(geoms), "propzip": "first"})
+    )
+
+    parcel_gdf = parcel_gdf.drop_duplicates()
+    parcel_gdf["year"] = year
+
+    return gpd.GeoDataFrame(parcel_gdf, geometry="geometry", crs="EPSG:3857").to_crs(
+        4326
+    )
 
 
 def clean_own_id(own_id):
@@ -255,15 +237,12 @@ if __name__ == "__main__":
     own_id_map = get_own_id_map()
 
     csv_df_list = []
-    years = []
-    for csv_filename in os.listdir(os.path.join(INPUT_DIR, "praxis_csvs")):
-        if "Final" not in csv_filename:
-            continue
-        year_str = re.search(r"\d{4}", csv_filename)[0]
-        years.append(int(year_str))
-        print(csv_filename)
+    for year in YEARS:
+        print(f"CSV: {year}")
         csv_df_list.append(
-            clean_csv_df(os.path.join(INPUT_DIR, "praxis_csvs", csv_filename))
+            clean_csv_df(
+                os.path.join(INPUT_DIR, "praxis_csvs", f"PPlusFinal_{year}_edit.csv")
+            )
         )
 
     combined_df = pd.concat(csv_df_list, ignore_index=True).drop_duplicates()
@@ -275,11 +254,12 @@ if __name__ == "__main__":
         .fillna(combined_df["taxpayer2"].apply(clean_owner).map(own_id_map))
     )
     combined_df = combined_df[~pd.isnull(combined_df["own_id"])]
+    combined_df = combined_df[~combined_df.own_id.str.contains(EXCLUDE_RE, regex=True)]
 
     # Only retain owners for years where they have at least 10 parcels
     # TODO: Maybe revisit and instead pull any owner with at least 10 parcels any year
     full_df_list = []
-    for year in years:
+    for year in YEARS:
         year_own_df = (
             combined_df[combined_df["year"] == year]
             .groupby(["own_id"])
@@ -296,64 +276,26 @@ if __name__ == "__main__":
         )
     full_df = pd.concat(full_df_list, ignore_index=True).drop_duplicates()
 
-    parcel_df = full_df.drop_duplicates(
-        subset=["parcelno", "propaddr", "propno"]
-    ).rename(columns={"geom": "geom_"})
-
     print("reading zip")
     zip_df = gpd.read_file(os.path.join(INPUT_DIR, "zipcodes.geojson"))
 
     geom_df_list = []
-    for shp_filename in os.listdir(os.path.join(INPUT_DIR, "praxis_shapefiles")):
-        if shp_filename.endswith(".zip") or shp_filename.endswith(".shp"):
-            print(shp_filename)
-            geom_df_list.append(
-                clean_shp_df(
-                    os.path.join(INPUT_DIR, "praxis_shapefiles", shp_filename),
-                    zip_df,
-                    parcel_df,
-                )
+    for year in YEARS:
+        if year < 2022:
+            shp_filename = f"praxis{year}.shp.zip"
+        else:
+            shp_filename = f"praxis{year}.shp"
+        print(shp_filename)
+        geom_df_list.append(
+            clean_shp_df(
+                os.path.join(INPUT_DIR, "praxis_shapefiles", shp_filename),
+                zip_df,
+                full_df,
             )
+        )
 
     parcel_prop_df = pd.concat(geom_df_list).drop_duplicates(
         subset=["parcelno", "year"]
-    )
-
-    prop_df = (
-        parcel_prop_df.drop_duplicates(subset=["parcelno", "propaddr"])
-        .reset_index()
-        .rename(columns={"index": "_old_index"})
-        .reset_index()
-        .rename(columns={"index": "prop_id"})
-        .rename(columns=COL_MAP)
-    )
-
-    prop_db_df = prop_df[
-        [
-            "prop_id",
-            "propno",
-            "parcelno",
-            "propaddr",
-            "propdir",
-            "propstr",
-            "propzip",
-            "zipcode_sj",
-        ]
-    ]
-
-    parcel_prop_df = (
-        parcel_prop_df.reset_index()
-        .rename(columns={"index": "_old_index"})
-        .reset_index()
-        .rename(columns={"index": "parprop_id"})
-        .rename(columns=COL_MAP)
-    )
-
-    parcel_prop_df = pd.merge(
-        parcel_prop_df,
-        prop_df[["parcelno", "propaddr", "prop_id"]],
-        on=["parcelno", "propaddr"],
-        how="left",
     )
 
     own_group_df = (
@@ -364,117 +306,126 @@ if __name__ == "__main__":
     )
     own_group_df["own_group"] = own_group_df["own_count"].apply(own_group)
 
-    parcel_prop_df = pd.merge(
-        parcel_prop_df,
+    full_own_df = pd.merge(
+        full_df,
         own_group_df[["year", "own_id", "own_count", "own_group"]],
         on=["year", "own_id"],
         how="left",
     )
-    parcel_prop_df = parcel_prop_df.loc[parcel_prop_df["own_group"] > 0]
+    full_own_df = full_own_df.rename(columns={"propzip": "propzip2"})
 
-    parcel_prop_df = gpd.GeoDataFrame(
-        parcel_prop_df[
-            [
-                "parprop_id",
-                "prop_id",
-                "parcelno",
-                "propaddr",
-                "year",
-                "own_id",
-                "own_group",
-                "own_count",
-                "geometry",
-                "zipcode_sj",
-            ]
-        ].rename(columns={"geometry": "geom"}),
-        crs="EPSG:4326",
-        geometry="geom",
+    parcel_df = full_own_df.merge(parcel_prop_df, how="left")
+    parcel_df = parcel_df.loc[parcel_df["own_group"] > 0]
+    parcel_df.loc[parcel_df["propzip"].isnull(), "propzip"] = (
+        parcel_df["propzip2"]
+        .where(parcel_df["propzip2"].notnull())
+        .where(parcel_df["propzip"].isnull())
+        .str.split("-", n=1)
+        .str[0]
     )
 
-    for year in parcel_prop_df["year"].unique():
-        parcel_prop_year = gpd.GeoDataFrame(
-            parcel_prop_df.loc[parcel_prop_df["year"] == year][
-                [
-                    "prop_id",
-                    "parcelno",
-                    "propaddr",
-                    "year",
-                    "own_id",
-                    "own_group",
-                    "own_count",
-                    "zipcode_sj",
-                    "geom",
-                ]
-            ],
-            crs="EPSG:4326",
-            geometry="geom",
-        )
-        parcel_prop_year.to_file(os.path.join(DATA_DIR, f"parcels-{year}.geojson"))
-    parcel_prop_df["centroid"] = parcel_prop_df.centroid
-    parcel_prop_df = gpd.GeoDataFrame(
-        parcel_prop_df[
+    parcel_df = gpd.GeoDataFrame(parcel_df, geometry="geometry", crs="EPSG:4326")
+    parcel_df["feature_id"] = parcel_df.index
+    parcel_df["centroid"] = parcel_df.centroid
+    parcel_df = parcel_df.rename(columns={"geom": "geom_"})
+    parcel_df = parcel_df.rename(columns={"geometry": "geom"})
+    parcel_df["count"] = parcel_df["own_count"]
+
+    parcel_df = gpd.GeoDataFrame(
+        parcel_df[
             [
-                "parprop_id",
-                "prop_id",
-                "parcelno",
+                "feature_id",
+                "saledate",
+                "saleprice",
+                "totsqft",
+                "totacres",
+                "year",
                 "propaddr",
                 "own_id",
+                "taxpayer",
+                "count",  # TODO: rename own_count, would require app refactor
                 "own_group",
-                "own_count",
-                "year",
-                "geom",
+                "parcelno",
+                "propno",
+                "propdir",
+                "propzip",
+                "propzip2",
+                "resyrbuilt",
                 "centroid",
-                "zipcode_sj",
+                "geom",
             ]
         ],
         crs="EPSG:4326",
         geometry="geom",
     )
 
-    for year in parcel_prop_df["year"].unique():
-        parcel_prop_year = gpd.GeoDataFrame(
-            parcel_prop_df.loc[parcel_prop_df["year"] == year][
+    parcel_df["saledate"] = parcel_df["saledate"].apply(clean_dates).dt.date
+    parcel_df["resyrbuilt"] = pd.to_numeric(
+        parcel_df["resyrbuilt"], errors="coerce", downcast="integer"
+    ).astype("Int64")
+
+    for year in YEARS:
+        print(year)
+        year_df = parcel_df.loc[parcel_df["year"] == year].rename(
+            columns={"count": "own_count"}
+        )
+        gpd.GeoDataFrame(
+            year_df[
                 [
-                    "prop_id",
+                    "feature_id",
+                    "parcelno",
+                    "propaddr",
+                    "propzip",
+                    "year",
+                    "own_id",
+                    "own_group",
+                    "own_count",
+                    "geom",
+                ]
+            ],
+            crs="EPSG:4326",
+            geometry="geom",
+        ).to_file(os.path.join(DATA_DIR, f"parcels-{year}.geojson"))
+
+        gpd.GeoDataFrame(
+            year_df[
+                [
+                    "feature_id",
                     "parcelno",
                     "propaddr",
                     "year",
                     "own_id",
                     "own_group",
                     "own_count",
-                    "zipcode_sj",
+                    "propzip",
                     "centroid",
                 ]
             ],
             crs="EPSG:4326",
             geometry="centroid",
-        )
-        parcel_prop_year.to_file(
-            os.path.join(DATA_DIR, f"parcels-centroids-{year}.geojson")
+        ).to_file(os.path.join(DATA_DIR, f"parcels-centroids-{year}.geojson"))
+
+        year_df.drop(["geom", "centroid"], axis=1).to_csv(
+            os.path.join(DATA_DIR, f"parcels-{year}.csv"),
+            index=False,
+            quoting=csv.QUOTE_NONNUMERIC,
         )
 
-    parcel_prop_df.drop(columns=["own_group", "own_id", "own_count"], inplace=True)
+    # TODO: Seeing a good amount of duplicates on PIN here, but addresses different
     # Have to convert directly to WKT here to avoid SQL issues
-    parcel_prop_df["centroid"] = parcel_prop_df["centroid"].apply(
-        lambda x: f"SRID=4326;{x.wkt}"
+    # TODO: Why are there null values
+    parcel_df["centroid"] = parcel_df["centroid"].apply(
+        lambda x: f"SRID=4326;{x.wkt}" if x else None
     )
 
     print("writing zips_geom")
     zip_df[["zipcode", "geometry"]].to_postgis("zips_geom", if_exists="append", con=db)
     print("wrote zips_geom")
 
-    print("writing property")
-    prop_db_df.to_sql("property", if_exists="append", con=db, index=False)
-    print("wrote property")
-
-    print("writing parcel_property_geom")
-    parcel_prop_df.to_postgis(
-        "parcel_property_geom", if_exists="append", con=db, index=False
-    )
-    print("wrote parcel_property_geom")
-
-    prop_merge_df = prop_df[["parcelno", "propaddr", "prop_id"]]
-    full_df = pd.merge(full_df, prop_merge_df, on=["parcelno", "propaddr"], how="left")
+    # breakpoint()
+    print("writing parcels")
+    parcel_df.to_postgis("parcels", if_exists="append", con=db)
+    print("wrote parcels")
 
     owntax_df = (
         full_df[["own_id", "taxpayer"]]
@@ -506,49 +457,3 @@ if __name__ == "__main__":
     print("writing taxpayer")
     taxpayer_df.to_sql("taxpayer", if_exists="append", con=db, index=False)
     print("wrote taxpayer")
-    full_df = pd.merge(
-        full_df,
-        taxpayer_df,
-        on=[
-            "owntax_id",
-            "taxpayer2",
-            "tpaddr",
-            "tpcity",
-            "tpstate",
-            "tpzip",
-            "taxstatus",
-        ],
-        how="left",
-    )
-
-    taxpayer_property_df = (
-        full_df[["tp_id", "prop_id"]]
-        .drop_duplicates()
-        .reset_index()
-        .rename(columns={"index": "taxparprop_id"})
-    )
-    print("writing taxpayer_property")
-    taxpayer_property_df.to_sql(
-        "taxpayer_property", if_exists="append", con=db, index=False
-    )
-    print("wrote taxpayer_property")
-    full_df = pd.merge(
-        full_df, taxpayer_property_df, on=["tp_id", "prop_id"], how="left"
-    )
-
-    year_df = full_df[
-        [
-            "taxparprop_id",
-            "year",
-            "saledate",
-            "saleprice",
-            "totsqft",
-            "totacres",
-            "cityrbuilt",
-            "resyrbuilt",
-        ]
-    ].drop_duplicates(subset=["taxparprop_id", "year"])
-
-    year_df["saledate"] = year_df["saledate"].apply(clean_dates).dt.date
-    print("writing year")
-    year_df.to_sql("year", if_exists="append", con=db, index=False)

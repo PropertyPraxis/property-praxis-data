@@ -23,8 +23,8 @@ tiles/parcels-centroids-%.mbtiles: data/parcels-centroids-%.geojson
 	--detect-shared-borders \
 	--coalesce-smallest-as-needed \
 	--attribute-type=parcelno:string \
-	--attribute-type=zipcode_sj:string \
-	--use-attribute-for-id=prop_id \
+	--attribute-type=propzip:string \
+	--use-attribute-for-id=feature_id \
 	--force \
 	-L parcels:$< -o $@
 
@@ -40,8 +40,8 @@ tiles/parcels-%.mbtiles: data/parcels-%.geojson
 	--grid-low-zooms \
 	--coalesce-smallest-as-needed \
 	--attribute-type=parcelno:string \
-	--attribute-type=zipcode_sj:string \
-	--use-attribute-for-id=prop_id \
+	--attribute-type=propzip:string \
+	--use-attribute-for-id=feature_id \
 	--force \
 	-L parcels:$< -o $@
 
