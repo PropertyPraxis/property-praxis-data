@@ -78,53 +78,6 @@ CREATE TABLE year (
 
 CREATE INDEX year_year_idx ON year (year);
 
-CREATE MATERIALIZED VIEW owner_count AS (
-    (
-        SELECT
-            DISTINCT ppg.year,
-            STRING_AGG(DISTINCT ot.own_id, ',') AS own_id,
-            COUNT(ot.own_id) AS count,
-            CASE
-                WHEN (
-                    COUNT(ot.own_id) > 9
-                    AND COUNT(ot.own_id) <= 20
-                ) THEN 1
-                WHEN (
-                    COUNT(ot.own_id) > 20
-                    AND COUNT(ot.own_id) <= 100
-                ) THEN 2
-                WHEN (
-                    COUNT(ot.own_id) > 100
-                    AND COUNT(ot.own_id) <= 200
-                ) THEN 3
-                WHEN (
-                    COUNT(ot.own_id) > 200
-                    AND COUNT(ot.own_id) <= 500
-                ) THEN 4
-                WHEN (
-                    COUNT(ot.own_id) > 500
-                    AND COUNT(ot.own_id) <= 1000
-                ) THEN 5
-                WHEN (
-                    COUNT(ot.own_id) > 1000
-                    AND COUNT(ot.own_id) <= 1500
-                ) THEN 6
-                WHEN (
-                    COUNT(ot.own_id) > 1500
-                ) THEN 7
-            END AS own_group
-        FROM
-            parcel_property_geom AS ppg
-            INNER JOIN property AS p ON ppg.prop_id = p.prop_id
-            INNER JOIN taxpayer_property AS tp ON p.prop_id = tp.prop_id
-            INNER JOIN taxpayer AS t ON tp.tp_id = t.tp_id
-            INNER JOIN owner_taxpayer AS ot ON t.owntax_id = ot.owntax_id
-        GROUP BY
-            ppg.year,
-            ot.own_id
-    )
-);
-
 CREATE TABLE parcels (
     feature_id SERIAL,
     saledate DATE,
@@ -159,3 +112,19 @@ CREATE INDEX parcels_zipcode_idx ON parcels USING gin(propzip gin_trgm_ops);
 CREATE INDEX parcels_spatial_idx ON parcels USING gist(centroid);
 
 CREATE INDEX parcels_spatial_geom_idx ON parcels USING gist(geom);
+
+CREATE MATERIALIZED VIEW owner_count AS (
+    (
+        SELECT
+            DISTINCT p.year,
+            p.own_id AS own_id,
+            p.own_group AS own_group,
+            COUNT(p.own_id) AS count
+        FROM
+            parcels AS p
+        GROUP BY
+            p.year,
+            p.own_id,
+            p.own_group
+    )
+);
