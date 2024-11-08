@@ -43,7 +43,7 @@ if __name__ == "__main__":
     df["own_id"] = df["own_id"].apply(clean_own_id)
     df["own_id"] = df["own_id"].apply(
         lambda x: 'MANUEL "MATTY" MOROUN'
-        if (("MANUEL" in x) and ("MOROUN" in x))
+        if ((("MANUEL" in x) or ("MATTHEW" in x)) and ("MOROUN" in x))
         else x
     )
     df["own_id"] = df["own_id"].apply(
