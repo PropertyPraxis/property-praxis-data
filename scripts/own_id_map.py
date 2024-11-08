@@ -46,5 +46,8 @@ if __name__ == "__main__":
         if (("MANUEL" in x) and ("MOROUN" in x))
         else x
     )
+    df["own_id"] = df["own_id"].apply(
+        lambda x: "SALAMEH JASER" if (("SALAMEH" in x) and ("JASER" in x)) else x
+    )
     df = df[~df.own_id.str.contains(EXCLUDE_RE, regex=True)]
     df.to_csv(os.path.join(INPUT_DIR, "own-id-map.csv"), index=False)
