@@ -52,7 +52,10 @@ if __name__ == "__main__":
     )
     df["own_id"] = df.apply(
         lambda x: "MATTHEW TATARIAN"
-        if (x["taxpayer1"] == "TATARIAN, MATTHEW M")
+        if (
+            (x["taxpayer1"] in ["TATARIAN, MATTHEW M", "TATARIAN MATTHEW M"])
+            or ("TATARIAN MATTHEW" in x["taxpayer1"])
+        )
         else x["own_id"],
         axis=1,
     )

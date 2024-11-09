@@ -228,6 +228,7 @@ def get_own_id_map():
     own_id_map = {}
     own_id_df = pd.read_csv(os.path.join(INPUT_DIR, "own-id-map.csv"))
     for record in own_id_df.to_dict(orient="records"):
+        own_id_map[record["taxpayer1"]] = record["own_id"]
         own_id_map[clean_owner(record["taxpayer1"])] = record["own_id"]
         # TODO: add taxpayer2?
     return own_id_map
@@ -251,8 +252,9 @@ if __name__ == "__main__":
 
     combined_df["own_id"] = (
         combined_df["taxpayer"]
-        .apply(clean_owner)
         .map(own_id_map)
+        .fillna(combined_df["taxpayer"].apply(clean_owner).map(own_id_map))
+        .fillna(combined_df["taxpayer2"].map(own_id_map))
         .fillna(combined_df["taxpayer2"].apply(clean_owner).map(own_id_map))
     )
     combined_df = combined_df[~pd.isnull(combined_df["own_id"])]
