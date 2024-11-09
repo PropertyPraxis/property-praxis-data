@@ -13,7 +13,6 @@ db = create_engine(
 )
 
 YEARS = [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
-# YEARS = [2019, 2024]
 
 INPUT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "input"
@@ -85,7 +84,7 @@ ZIP_COL_MAP = {
     "zip_code": "propzip",
 }
 
-EXCLUDE_RE = r"LAND BANK|CITY OF DETROIT|DETROIT PARKS|BRIDGE AUTHORITY|MDOT|DEPARTMENT OF|DEPT OF|UNK_|UNIDENTIFIED|UNKNOWN|TRUST|HENRY FORD|UAT|WAYNE COUNTY|NON\-PROFIT"  # noqa
+EXCLUDE_RE = r"LAND BANK|CITY OF DETROIT|DETROIT PARKS|BRIDGE AUTHORITY|MDOT|DEPARTMENT OF|DEPT OF|UNK_|UNIDENTIFIED|UNKNOWN|TRUST|HENRY FORD|UAT|UAW|DTE|FCA|WAYNE COUNTY|NON\-PROFIT|TAXPAYER"  # noqa
 
 
 def clean_owner(owner):
@@ -245,7 +244,9 @@ if __name__ == "__main__":
             )
         )
 
-    combined_df = pd.concat(csv_df_list, ignore_index=True).drop_duplicates()
+    combined_df = pd.concat(csv_df_list, ignore_index=True).drop_duplicates(
+        subset=["parcelno", "year"]
+    )
 
     combined_df["own_id"] = (
         combined_df["taxpayer"]
@@ -254,7 +255,13 @@ if __name__ == "__main__":
         .fillna(combined_df["taxpayer2"].apply(clean_owner).map(own_id_map))
     )
     combined_df = combined_df[~pd.isnull(combined_df["own_id"])]
-    combined_df = combined_df[~combined_df.own_id.str.contains(EXCLUDE_RE, regex=True)]
+    combined_df = combined_df[
+        ~(
+            combined_df["own_id"].str.contains(EXCLUDE_RE, regex=True)
+            | combined_df["taxpayer"].str.contains(EXCLUDE_RE, regex=True)
+            | combined_df["taxpayer2"].str.contains(EXCLUDE_RE, regex=True)
+        )
+    ]
 
     # Only retain owners for years where they have at least 10 parcels
     # TODO: Maybe revisit and instead pull any owner with at least 10 parcels any year
@@ -376,6 +383,7 @@ if __name__ == "__main__":
                     "parcelno",
                     "propaddr",
                     "propzip",
+                    "taxpayer",
                     "year",
                     "own_id",
                     "own_group",

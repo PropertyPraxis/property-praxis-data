@@ -16,7 +16,7 @@ COL_MAP = {
 
 SPACE_RE = r"\s+"
 CLEAN_RE = r"(\.|,)"
-EXCLUDE_RE = r"LAND BANK|CITY OF DETROIT|DETROIT PARKS|BRIDGE AUTHORITY|MDOT|DEPARTMENT OF|DEPT OF|UNK_|UNIDENTIFIED|UNKNOWN|TRUST|HENRY FORD|UAT|WAYNE COUNTY|NON\-PROFIT"  # noqa
+EXCLUDE_RE = r"LAND BANK|CITY OF DETROIT|DETROIT PARKS|BRIDGE AUTHORITY|MDOT|DEPARTMENT OF|DEPT OF|UNK_|UNIDENTIFIED|UNKNOWN|TRUST|HENRY FORD|UAT|UAW|DTE|FCA|WAYNE COUNTY|NON\-PROFIT|TAXPAYER"  # noqa
 
 
 def clean_own_id(own_id):
@@ -49,5 +49,11 @@ if __name__ == "__main__":
     df["own_id"] = df["own_id"].apply(
         lambda x: "SALAMEH JASER" if (("SALAMEH" in x) and ("JASER" in x)) else x
     )
-    df = df[~df.own_id.str.contains(EXCLUDE_RE, regex=True)]
+    df = df[
+        ~(
+            df.own_id.str.contains(EXCLUDE_RE, regex=True)
+            | df.taxpayer1.str.contains(EXCLUDE_RE, regex=True)
+            | df.taxpayer2.str.contains(EXCLUDE_RE, regex=True)
+        )
+    ]
     df.to_csv(os.path.join(INPUT_DIR, "own-id-map.csv"), index=False)
