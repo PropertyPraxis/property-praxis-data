@@ -63,6 +63,18 @@ if __name__ == "__main__":
         lambda x: "JAMAL ALKIBBI" if "ALFA KIBBI" in x["taxpayer1"] else x["own_id"],
         axis=1,
     )
+    df["own_id"] = df.apply(
+        lambda x: "PAUL PICIOCCHI"
+        if (x["taxpayer1"] == "PICIOCCHI PAUL")
+        else x["own_id"],
+        axis=1,
+    )
+    df["own_id"] = df.apply(
+        lambda x: "PAULINA WALID SHEREAF"
+        if (("PAULINA" in x["taxpayer1"]) and ("WALID" in x["taxpayer1"]))
+        else x["own_id"],
+        axis=1,
+    )
     df = df[
         ~(
             df.own_id.str.contains(EXCLUDE_RE, regex=True)
