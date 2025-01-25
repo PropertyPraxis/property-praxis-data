@@ -2,7 +2,14 @@
 
 Code for building the Property Praxis database
 
-## Steps
+## Build locally
+
+```
+make data
+make tiles
+```
+
+## Steps to rebuild
 
 - Download a parcel file from the city's data portal
 - Create a list of parcels that have changed ownership and aren't currently coded by updating and running `scripts/identify_ownership.py`

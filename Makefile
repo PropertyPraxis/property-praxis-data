@@ -1,7 +1,8 @@
 S3_BUCKET = property-praxis-data
 YEARS = 2015 2016 2017 2018 2019 2020 2021 2022 2023 2024
 
-all: $(foreach year,$(YEARS),tiles/parcels-$(year)/ tiles/parcels-centroids-$(year)/)
+.PHONY: tiles
+tiles: $(foreach year,$(YEARS),tiles/parcels-$(year)/ tiles/parcels-centroids-$(year)/)
 
 .PHONY: data
 data: input/praxis_csvs/ input/praxis_shapefiles/ input/zipcodes.geojson
@@ -57,7 +58,7 @@ input/praxis_csvs/PPlusFinal_2022.csv: input/own-id-map.csv
 input/praxis_csvs/PPlusFinal_2021.csv: input/own-id-map.csv
 	poetry run python scripts/clean_2021.py
 
-input/own-id-map.csv:
+input/own-id-map.csv: input/praxis_csvs/ input/praxis_shapefiles/
 	poetry run python scripts/own_id_map.py
 
 # TODO: fix projection here to avoid handling in geopandas
@@ -65,4 +66,4 @@ input/zipcodes.geojson:
 	wget -O $@ "https://opendata.arcgis.com/datasets/f6273f93db1b4f57b7091ef1f43271e7_0.geojson"
 
 input/%:
-	aws s3 cp s3://$(S3_BUCKET)/$* ./data/$* --recursive
+	aws s3 cp s3://$(S3_BUCKET)/$* ./input/$* --recursive
