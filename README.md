@@ -5,6 +5,7 @@ Code for building the Property Praxis database
 ## Build locally
 
 ```
+poetry install --no-root
 make data
 make tiles
 ```
