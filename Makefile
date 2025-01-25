@@ -58,7 +58,7 @@ input/praxis_csvs/PPlusFinal_2022.csv: input/own-id-map.csv
 input/praxis_csvs/PPlusFinal_2021.csv: input/own-id-map.csv
 	poetry run python scripts/clean_2021.py
 
-input/own-id-map.csv: input/praxis_csvs/ input/praxis_shapefiles/
+input/own-id-map.csv: input/praxis_csvs/ input/praxis_shapefiles/ input/city/
 	poetry run python scripts/own_id_map.py
 
 # TODO: fix projection here to avoid handling in geopandas
