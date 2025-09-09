@@ -7,7 +7,7 @@ years = [2015, 2016, 2017, 2018, 2019, 2020]
 INPUT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "input"
 )
-map_years = [2021, 2022, 2023, 2024]
+map_years = [2021, 2022, 2023, 2024, 2025]
 COL_MAP = {
     "taxpayer_1": "taxpayer1",
     "taxpayer_2": "taxpayer2",

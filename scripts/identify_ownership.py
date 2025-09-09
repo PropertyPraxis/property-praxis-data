@@ -32,6 +32,14 @@ COL_MAP = {
     "taxpcity": "taxpayer_city",
     "tpcity": "taxpayer_city",
     "taxpayer_street": "taxpayer_address",
+    "Parcel ID": "parcel_num",
+    "Address": "address",
+    "Taxpayer 1": "taxpayer1",
+    "Taxpayer 2": "taxpayer2",
+    "Taxpayer Address": "taxpayer_address",
+    "Taxpayer City": "taxpayer_city",
+    "Taxpayer State": "taxpayer_state",
+    "Sale Date": "sale_date",
 }
 SPACE_RE = r"\s+"
 CLEAN_RE = r"(\.|,)"
@@ -634,11 +642,143 @@ def compare_24_23():
     )
 
 
+def compare_25_24():
+    df_24 = pd.read_csv(
+        os.path.join(INPUT_DIR, "city", "parcels_2024.csv"),
+        dtype={"parcel_number": "str"},
+    ).rename(columns=COL_MAP)[
+        [
+            "parcel_num",
+            "taxpayer1",
+            "taxpayer2",
+            "taxpayer_address",
+            "taxpayer_city",
+        ]
+    ]
+    df_24["own_id"] = ""
+    df_24["parcel_num"] = df_24["parcel_num"].apply(fix_parcelno)
+    df_24.drop_duplicates(subset=["parcel_num"], inplace=True)
+    df_24["taxpayer_address"] = (
+        df_24["taxpayer_address"]
+        .str.replace(SPACE_RE, " ", regex=True)
+        .str.strip()
+        .str.replace(CLEAN_RE, "", regex=True)
+        .str.replace(ADDR_SUFFIX_RE, "", regex=True)
+    )
+    df_24["taxpayer1"] = df_24["taxpayer1"].apply(clean_owner)
+    df_24["taxpayer2"] = df_24["taxpayer2"].apply(clean_owner)
+
+    own_df = pd.read_csv(os.path.join(INPUT_DIR, "own-id-map.csv"))
+    own_df["taxpayer1"] = own_df["taxpayer1"].apply(clean_owner)
+    own_df["taxpayer2"] = own_df["taxpayer2"].apply(clean_owner)
+    own_records = own_df.to_dict(orient="records")
+
+    own_id_map = {}
+    for r in own_records:
+        if not r["own_id"] or "UNID" in r["own_id"] or "UNK_" in r["own_id"]:
+            continue
+        if r["taxpayer1"] not in own_id_map:
+            own_id_map[r["taxpayer1"]] = r["own_id"]
+
+    df_25 = pd.read_csv(
+        os.path.join(INPUT_DIR, "city", "parcels_2025.csv"),
+        dtype={"Parcel ID": "str"},
+    ).rename(columns=COL_MAP)[
+        [
+            "parcel_num",
+            "address",
+            "taxpayer1",
+            "taxpayer2",
+            "taxpayer_address",
+            "taxpayer_city",
+        ]
+    ]
+    df_25["own_id"] = ""
+    df_25["parcel_num"] = df_25["parcel_num"].apply(fix_parcelno)
+    df_25.drop_duplicates(subset=["parcel_num"], inplace=True)
+    df_25["address"] = (
+        df_25["address"]
+        .str.replace(SPACE_RE, " ", regex=True)
+        .str.strip()
+        .str.replace(CLEAN_RE, "", regex=True)
+        .str.replace(ADDR_SUFFIX_RE, "", regex=True)
+    )
+    df_25["taxpayer_address"] = (
+        df_25["taxpayer_address"]
+        .str.replace(SPACE_RE, " ", regex=True)
+        .str.strip()
+        .str.replace(CLEAN_RE, "", regex=True)
+        .str.replace(ADDR_SUFFIX_RE, "", regex=True)
+    )
+    df_25["taxpayer1"] = df_25["taxpayer1"].apply(clean_owner)
+    df_25["taxpayer2"] = df_25["taxpayer2"].apply(clean_owner)
+
+    to_merge_25_df = (
+        df_25[
+            [
+                "parcel_num",
+                "address",
+                "taxpayer1",
+                "taxpayer2",
+                "own_id",
+                "taxpayer_address",
+                "taxpayer_city",
+            ]
+        ]
+        .rename(
+            columns={
+                "taxpayer1": "taxpayer1_25",
+                "taxpayer2": "taxpayer2_25",
+                "own_id": "own_id_25",
+                "taxpayer_address": "taxpayer_address_25",
+                "taxpayer_city": "taxpayer_city_25",
+            }
+        )
+        .sort_values(by=["parcel_num", "own_id_25"], ascending=True)
+        .drop_duplicates(subset=["parcel_num"])
+    )
+    merge_df = to_merge_25_df.merge(df_24, on="parcel_num", how="left")
+
+    # Don't override own_id if exists already
+    def pull_own_id(d):
+        if d["taxpayer1_25"] in own_id_map:
+            return own_id_map[d["taxpayer1_25"]]
+        if d["taxpayer2_25"]:
+            # Try 2 if 1 not a match
+            return own_id_map.get(d["taxpayer2_25"])
+        return ""
+
+    merge_df["own_id_25"] = merge_df.apply(
+        pull_own_id,
+        axis=1,
+    )
+    merge_df["taxpayer1_25"] = merge_df["taxpayer1_25"].fillna("")
+    merge_df["taxpayer_address_25"] = merge_df["taxpayer_address_25"].fillna("")
+
+    changed_merge_df = merge_df[
+        (merge_df["taxpayer1"] != merge_df["taxpayer1_25"])
+        & (~merge_df["taxpayer1_25"].str.contains(DETROIT_RE))
+        & (merge_df["taxpayer1_25"] != "HUD")
+        & (merge_df["address"] != merge_df["taxpayer_address_25"])
+        & (merge_df["own_id_25"] == "")
+    ]
+    changed_merge_df["taxpayer1_25_count"] = changed_merge_df.groupby("taxpayer1_25")[
+        "taxpayer1_25"
+    ].transform("count")
+    changed_merge_df.sort_values(
+        by=["taxpayer1_25_count", "taxpayer1_25"], ascending=False, inplace=True
+    )
+    changed_merge_df.to_csv(
+        "owners-2025.csv", quoting=csv.QUOTE_NONNUMERIC, index=False
+    )
+
+
 def main():
-    compare_21_20()
-    compare_22_21()
-    compare_23_22()
-    compare_24_23()
+    # compare_21_20()
+    # compare_22_21()
+    # compare_23_22()
+    # compare_24_23()
+    compare_25_24()
 
 
 if __name__ == "__main__":
