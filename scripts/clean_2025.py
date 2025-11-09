@@ -45,6 +45,10 @@ def clean_owner(owner):
 
 if __name__ == "__main__":
     parcel_gdf = gpd.read_file(os.path.join(INPUT_DIR, "city", "parcels_2025.geojson"))
+    # Date format changed in between
+    parcel_gdf["sale_date"] = pd.to_datetime(
+        parcel_gdf["sale_date"], format="%a, %d %b %Y %H:%M:%S %Z", errors="coerce"
+    ).dt.normalize()
 
     own_id_map = {}
     for record in pd.read_csv(os.path.join(INPUT_DIR, "own-id-map.csv")).to_dict(

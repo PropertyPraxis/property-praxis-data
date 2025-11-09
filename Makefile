@@ -1,5 +1,5 @@
 S3_BUCKET = property-praxis-data
-YEARS = 2015 2016 2017 2018 2019 2020 2021 2022 2023 2024
+YEARS = 2015 2016 2017 2018 2019 2020 2021 2022 2023 2024 2025
 
 .PHONY: tiles
 tiles: $(foreach year,$(YEARS),tiles/parcels-$(year)/ tiles/parcels-centroids-$(year)/)
@@ -45,6 +45,9 @@ tiles/parcels-%.mbtiles: data/parcels-%.geojson
 	--use-attribute-for-id=feature_id \
 	--force \
 	-L parcels:$< -o $@
+
+input/praxis_csvs/PPlusFinal_2025.csv: input/own-id-map.csv
+	poetry run python scripts/clean_2025.py
 
 input/praxis_csvs/PPlusFinal_2024.csv: input/own-id-map.csv
 	poetry run python scripts/clean_2024.py

@@ -12,7 +12,7 @@ db = create_engine(
     os.getenv("DATABASE_URL", "postgresql://postgres:postgres@0.0.0.0:35432/postgres")
 )
 
-YEARS = [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
+YEARS = [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
 
 INPUT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "input"
@@ -57,6 +57,7 @@ COL_MAP = {
     "parcel_num": "parcelno",
     "parcelnum": "parcelno",
     "parcel_number": "parcelno",
+    "parcel_id": "parcelno",
     "address": "propaddr",
     "taxpayerstreet": "tpaddr",
     "taxpayer_s": "tpaddr",
@@ -73,7 +74,7 @@ COL_MAP = {
     "sale_price": "saleprice",
     "total_squa": "totsqft",
     "total_acre": "totacres",
-    "year_built": "resyrbuilt"
+    "year_built": "resyrbuilt",
     # TODO: Typo here, total something?
     # "taxpayerstate": "totacres",
 }
