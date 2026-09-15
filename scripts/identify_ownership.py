@@ -16,6 +16,7 @@ COL_MAP = {
     "pnum": "parcel_num",
     "parcelno": "parcel_num",
     "parcel_number": "parcel_num",
+    "parcel_id": "parcel_num",
     "taxpayer_1": "taxpayer1",
     "taxpayer_2": "taxpayer2",
     "saledate": "sale_date",
@@ -772,13 +773,143 @@ def compare_25_24():
         "owners-2025.csv", quoting=csv.QUOTE_NONNUMERIC, index=False
     )
 
+def compare_26_25():
+    df_25 = pd.read_csv(
+       os.path.join(INPUT_DIR, "city", "parcels_2025.csv"),
+        dtype={"Parcel ID": "str"},
+    ).rename(columns=COL_MAP)[
+        [
+            "parcel_num",
+            "taxpayer1",
+            "taxpayer2",
+            "taxpayer_address",
+            "taxpayer_city",
+        ]
+    ]
+    df_25["own_id"] = ""
+    df_25["parcel_num"] = df_25["parcel_num"].apply(fix_parcelno)
+    df_25.drop_duplicates(subset=["parcel_num"], inplace=True)
+    df_25["taxpayer_address"] = (
+        df_25["taxpayer_address"]
+        .str.replace(SPACE_RE, " ", regex=True)
+        .str.strip()
+        .str.replace(CLEAN_RE, "", regex=True)
+        .str.replace(ADDR_SUFFIX_RE, "", regex=True)
+    )
+    df_25["taxpayer1"] = df_25["taxpayer1"].apply(clean_owner)
+    df_25["taxpayer2"] = df_25["taxpayer2"].apply(clean_owner)
+
+    own_df = pd.read_csv(os.path.join(INPUT_DIR, "own-id-map.csv"))
+    own_df["taxpayer1"] = own_df["taxpayer1"].apply(clean_owner)
+    own_df["taxpayer2"] = own_df["taxpayer2"].apply(clean_owner)
+    own_records = own_df.to_dict(orient="records")
+
+    own_id_map = {}
+    for r in own_records:
+        if not r["own_id"] or "UNID" in r["own_id"] or "UNK_" in r["own_id"]:
+            continue
+        if r["taxpayer1"] not in own_id_map:
+            own_id_map[r["taxpayer1"]] = r["own_id"]
+
+    df_26 = pd.read_csv(
+        os.path.join(INPUT_DIR, "city", "parcels_2026.csv"),
+        dtype={"parcel_id": "str"},
+    ).rename(columns=COL_MAP)[
+        [
+            "parcel_num",
+            "address",
+            "taxpayer1",
+            "taxpayer2",
+            "taxpayer_address",
+            "taxpayer_city",
+        ]
+    ]
+    df_26["own_id"] = ""
+    df_26["parcel_num"] = df_26["parcel_num"].apply(fix_parcelno)
+    df_26.drop_duplicates(subset=["parcel_num"], inplace=True)
+    df_26["address"] = (
+        df_26["address"]
+        .str.replace(SPACE_RE, " ", regex=True)
+        .str.strip()
+        .str.replace(CLEAN_RE, "", regex=True)
+        .str.replace(ADDR_SUFFIX_RE, "", regex=True)
+    )
+    df_26["taxpayer_address"] = (
+        df_26["taxpayer_address"]
+        .str.replace(SPACE_RE, " ", regex=True)
+        .str.strip()
+        .str.replace(CLEAN_RE, "", regex=True)
+        .str.replace(ADDR_SUFFIX_RE, "", regex=True)
+    )
+    df_26["taxpayer1"] = df_26["taxpayer1"].apply(clean_owner)
+    df_26["taxpayer2"] = df_26["taxpayer2"].apply(clean_owner)
+
+    to_merge_26_df = (
+        df_26[
+            [
+                "parcel_num",
+                "address",
+                "taxpayer1",
+                "taxpayer2",
+                "own_id",
+                "taxpayer_address",
+                "taxpayer_city",
+            ]
+        ]
+        .rename(
+            columns={
+                "taxpayer1": "taxpayer1_26",
+                "taxpayer2": "taxpayer2_26",
+                "own_id": "own_id_26",
+                "taxpayer_address": "taxpayer_address_26",
+                "taxpayer_city": "taxpayer_city_26",
+            }
+        )
+        .sort_values(by=["parcel_num", "own_id_26"], ascending=True)
+        .drop_duplicates(subset=["parcel_num"])
+    )
+    merge_df = to_merge_26_df.merge(df_25, on="parcel_num", how="left")
+
+    # Don't override own_id if exists already
+    def pull_own_id(d):
+        if d["taxpayer1_26"] in own_id_map:
+            return own_id_map[d["taxpayer1_26"]]
+        if d["taxpayer2_26"]:
+            # Try 2 if 1 not a match
+            return own_id_map.get(d["taxpayer2_26"])
+        return ""
+
+    merge_df["own_id_26"] = merge_df.apply(
+        pull_own_id,
+        axis=1,
+    )
+    merge_df["taxpayer1_26"] = merge_df["taxpayer1_26"].fillna("")
+    merge_df["taxpayer_address_26"] = merge_df["taxpayer_address_26"].fillna("")
+
+    changed_merge_df = merge_df[
+        (merge_df["taxpayer1"] != merge_df["taxpayer1_26"])
+        & (~merge_df["taxpayer1_26"].str.contains(DETROIT_RE))
+        & (merge_df["taxpayer1_26"] != "HUD")
+        & (merge_df["address"] != merge_df["taxpayer_address_26"])
+        & (merge_df["own_id_26"] == "")
+    ]
+    changed_merge_df["taxpayer1_26_count"] = changed_merge_df.groupby("taxpayer1_26")[
+        "taxpayer1_26"
+    ].transform("count")
+    changed_merge_df.sort_values(
+        by=["taxpayer1_26_count", "taxpayer1_26"], ascending=False, inplace=True
+    )
+    changed_merge_df.to_csv(
+        "owners-2026.csv", quoting=csv.QUOTE_NONNUMERIC, index=False
+    )
 
 def main():
     # compare_21_20()
     # compare_22_21()
     # compare_23_22()
     # compare_24_23()
-    compare_25_24()
+    # compare_25_24()
+    compare_26_25()
 
 
 if __name__ == "__main__":
