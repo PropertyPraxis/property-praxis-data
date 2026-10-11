@@ -7,7 +7,7 @@ years = [2015, 2016, 2017, 2018, 2019, 2020]
 INPUT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "input"
 )
-map_years = [2021, 2022, 2023, 2024, 2025]
+map_years = [2021, 2022, 2023, 2024, 2025, 2026]
 COL_MAP = {
     "taxpayer_1": "taxpayer1",
     "taxpayer_2": "taxpayer2",
@@ -17,7 +17,7 @@ COL_MAP = {
 SPACE_RE = r"\s+"
 CLEAN_RE = r"(\.|,)"
 EXCLUDE_TAXPAYER_LIST = ["HUD"]
-EXCLUDE_RE = r"LAND BANK|CITY OF DETROIT|DETROIT PARKS|BRIDGE AUTHORITY|MDOT|DEPARTMENT OF|DEPT OF|UNK_|UNIDENTIFIED|UNKNOWN|TRUST|HENRY FORD|UAT|UAW|DTE|FCA|WAYNE COUNTY|NON\-PROFIT|TAXPAYER|RECOVERYPARK|RECOVERY PARK|VHS|HARPER\-HUTZEL|POPE FRANCIS|DETROIT MERCY|CATHEDRAL|PARISH|PERFECTING CHURCH| LDHA|OLYMPIA CONEY"  # noqa
+EXCLUDE_RE = r"LAND BANK|CITY OF DETROIT|DETROIT PARKS|BRIDGE AUTHORITY|MDOT|DEPARTMENT OF|DEPT OF|UNK_|UNIDENTIFIED|UNKNOWN|TRUST|HENRY FORD|UAT|UAW|DTE|FCA|WAYNE COUNTY|NON\-PROFIT|TAXPAYER|VHS|HARPER\-HUTZEL|POPE FRANCIS|DETROIT MERCY|CATHEDRAL|PARISH|PERFECTING CHURCH| LDHA|OLYMPIA CONEY"  # noqa
 
 
 def clean_own_id(own_id):
@@ -32,6 +32,7 @@ if __name__ == "__main__":
             os.path.join(INPUT_DIR, "praxis_csvs", f"PPlusFinal_{year}_edit.csv"),
         ).rename(columns=COL_MAP)[["taxpayer1", "taxpayer2", "own_id"]]
         df = df[~pd.isnull(df["own_id"])].drop_duplicates()
+        df = df[~pd.isnull(df["taxpayer1"])].drop_duplicates()
         df_list.append(df)
     for year in map_years:
         print(year)
@@ -39,6 +40,7 @@ if __name__ == "__main__":
             columns={"taxpayer": "taxpayer1", "owner": "own_id"}
         )
         df = df[~pd.isnull(df["own_id"])].drop_duplicates()
+        df = df[~pd.isnull(df["taxpayer1"])].drop_duplicates()
         df_list.append(df)
     df = pd.concat(df_list).drop_duplicates()
     df["own_id"] = df["own_id"].apply(clean_own_id)
@@ -54,13 +56,13 @@ if __name__ == "__main__":
         lambda x: "MATTHEW TATARIAN"
         if (
             (x["taxpayer1"] in ["TATARIAN, MATTHEW M", "TATARIAN MATTHEW M"])
-            or ("TATARIAN MATTHEW" in x["taxpayer1"])
+            or ("TATARIAN MATTHEW" in str(x["taxpayer1"]))
         )
         else x["own_id"],
         axis=1,
     )
     df["own_id"] = df.apply(
-        lambda x: "JAMAL ALKIBBI" if "ALFA KIBBI" in x["taxpayer1"] else x["own_id"],
+        lambda x: "JAMAL ALKIBBI" if "ALFA KIBBI" in str(x["taxpayer1"]) else x["own_id"],
         axis=1,
     )
     df["own_id"] = df.apply(
@@ -71,7 +73,7 @@ if __name__ == "__main__":
     )
     df["own_id"] = df.apply(
         lambda x: "PAULINA WALID SHEREAF"
-        if (("PAULINA" in x["taxpayer1"]) and ("WALID" in x["taxpayer1"]))
+        if (("PAULINA" in str(x["taxpayer1"])) and ("WALID" in str(x["taxpayer1"])))
         else x["own_id"],
         axis=1,
     )
@@ -82,5 +84,5 @@ if __name__ == "__main__":
             | df.taxpayer2.str.contains(EXCLUDE_RE, regex=True)
             | df.taxpayer1.isin(EXCLUDE_TAXPAYER_LIST)
         )
-    ]
+    ][["taxpayer1", "taxpayer2", "own_id", "notes"]]
     df.to_csv(os.path.join(INPUT_DIR, "own-id-map.csv"), index=False)

@@ -64,7 +64,7 @@ if __name__ == "__main__":
     )
     parcel_gdf["propstr"] = ""
 
-    parcel_gdf = parcel_gdf[~pd.isnull(parcel_gdf["own_id"])]
+    parcel_gdf = parcel_gdf[(~pd.isnull(parcel_gdf["own_id"])) & (parcel_gdf["own_id"] != "")]
     parcel_gdf["sale_date"] = parcel_gdf["sale_date"].dt.strftime("%Y-%m-%d")
     parcel_gdf.to_file(os.path.join(INPUT_DIR, "praxis_shapefiles", "praxis2026.shp"))
     parcel_gdf.drop(labels=["geometry"], axis=1).to_csv(
